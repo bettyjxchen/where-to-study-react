@@ -1,7 +1,7 @@
 //DOES: validate required fields in body
 function body(req, res, next) {
 	let {
-		location: { city, area, name, type, address, rating, info }
+		location: { city, area, name, type, address, rating, info, image }
 	} = req.body;
 
 	if (!city || !area || !name || !type || !address) {

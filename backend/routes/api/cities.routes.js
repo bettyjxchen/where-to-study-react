@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const auth = require("../auth");
 const City = require("../../models/City");
+const Area = require("../../models/Area");
 const Filters = require("./filters/cities.filters");
 
 /* ----------------------- Routes ----------------------- */
@@ -58,19 +59,19 @@ router.get("/:city", auth.optional, (req, res) => {
 });
 
 //PUT: edit city
-router.put("/:cityName", auth.optional, Filters.body, (req, res, next) => {
+router.put("/:city", auth.optional, Filters.body, (req, res, next) => {
 	let { city } = req.body;
-	let { cityName } = req.params;
+	let cityName = req.params.city;
 
 	//update city
 	City.findOne({ city: cityName })
 		.then(existing => {
-			//if city exists
 			if (existing) {
 				existing.city = city.city;
 				existing.country = city.country;
 				existing.save();
-				res.send(`${cityName} updated.`);
+
+				res.json(existing);
 			} else {
 				return res.send(`${cityName} not found.`);
 			}
@@ -81,13 +82,13 @@ router.put("/:cityName", auth.optional, Filters.body, (req, res, next) => {
 });
 
 //DELETE: delete city
-router.delete("/:cityName", auth.optional, (req, res, next) => {
-	let { cityName } = req.params;
+router.delete("/:city", auth.optional, (req, res, next) => {
+	let { city } = req.params;
 
 	//update city
-	City.deleteOne({ city: cityName })
+	City.deleteOne({ city: city })
 		.then(() => {
-			return res.send(`${cityName} deleted.`);
+			return res.send(`${city} deleted.`);
 		})
 		.catch(err => {
 			return res.sendStatus(400);
@@ -96,8 +97,8 @@ router.delete("/:cityName", auth.optional, (req, res, next) => {
 
 /* ----------------------- Helper Functions ----------------------- */
 //DOES: check for existing city
-function _checkExisting(cityIn) {
-	let { city, country } = cityIn;
+function _checkExisting(cityObj) {
+	let { city, country } = cityObj;
 	let result = {};
 
 	//validate existing city
@@ -108,7 +109,7 @@ function _checkExisting(cityIn) {
 			return result;
 		} else {
 			//create city from City model
-			const finalCity = new City(cityIn);
+			const finalCity = new City(cityObj);
 			finalCity.setDefaults();
 			result.city = finalCity;
 

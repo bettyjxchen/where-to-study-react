@@ -5,8 +5,11 @@ const LocationSchema = new mongoose.Schema({
 	area: { type: String, required: true },
 	name: { type: String, required: true },
 	type: { type: String, required: true },
+	image: { type: String, required: true },
+	review: String,
 	address_id: mongoose.Schema.Types.ObjectId,
 	rating: Number,
+	likes: Number,
 	info: {
 		hasWifi: Boolean,
 		hasOutlet: Boolean,
@@ -21,10 +24,15 @@ LocationSchema.methods.setDefaults = function() {
 	date = `${date.getMonth() + 1}-${date.getDate()}-${date.getFullYear()}`;
 
 	this.dateCreated = date;
+	this.likes = 0;
 };
 
 LocationSchema.methods.rateLocation = function(rating) {
 	this.rating = rating;
+};
+
+LocationSchema.methods.like = function() {
+	this.likes++;
 };
 
 module.exports = mongoose.model("Location", LocationSchema);

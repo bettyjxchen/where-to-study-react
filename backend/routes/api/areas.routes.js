@@ -43,24 +43,32 @@ router.get("/", auth.optional, (req, res, next) => {
 		.catch(err => res.sendStatus(400));
 });
 
-//GET: get area by name
+//GET: get all areas in city
+router.get("/:city", auth.optional, (req, res, next) => {
+	let { city } = req.params;
+
+	Area.find({ city: city })
+		.then(areas => {
+			if (areas.length) {
+				return res.json(areas);
+			} else {
+				return res.json(null);
+			}
+		})
+		.catch(err => res.sendStatus(400));
+});
+
+//GET: get area by city/area
 router.get("/:city/:area", auth.optional, (req, res) => {
 	let { city, area } = req.params;
 
-	//find city
-	City.findOne({ city: city })
-		.then(city => {
-			if (city) {
-				//find area
-				Area.findOne({ area: area }).then(area => {
-					if (area) {
-						return res.json(area);
-					} else {
-						return res.sendStatus(400);
-					}
-				});
+	//find area
+	Area.findOne({ city: city, area: area })
+		.then(area => {
+			if (area) {
+				return res.json(area);
 			} else {
-				return res.sendStatus(400);
+				return res.json({ error: "Could not find area." });
 			}
 		})
 		.catch(err => {
@@ -73,23 +81,41 @@ router.put("/:city/:area", auth.optional, Filters.body, (req, res, next) => {
 	let { city, area } = req.params;
 	let newArea = req.body.area;
 
-	//find city
-	City.findOne({ city: city })
-		.then(city => {
-			if (city) {
-				//find area
-				Area.findOne({ area: area }).then(existing => {
-					if (existing) {
-						existing.area = newArea.area;
-						existing.city = newArea.city;
-						existing.save();
-						res.send(`${area} updated.`);
-					} else {
-						return res.send(`${area} not found.`);
-					}
-				});
+	Area.findOne({ city: city, area: area })
+		.then(existing => {
+			if (existing) {
+				//update area
+				existing.area = newArea.area;
+				//update city
+				if (existing.city !== area.city) {
+					//update city numAreas count
+					City.findOne({ city: existing.city })
+						.then(city => {
+							if (city) {
+								//remove area
+								city.removeArea();
+								city.save();
+							}
+						})
+						.then(() => {
+							City.findOne({ city: newArea.city }).then(city => {
+								if (city) {
+									//add area
+									city.addArea();
+									city.save();
+								}
+
+								res.json(existing);
+							});
+						})
+						.then(() => {
+							existing.city = newArea.city;
+							existing.save();
+							res.json(existing);
+						});
+				}
 			} else {
-				return res.sendStatus(400);
+				return res.json({ error: `${area} not found.` });
 			}
 		})
 		.catch(err => {
@@ -101,24 +127,23 @@ router.put("/:city/:area", auth.optional, Filters.body, (req, res, next) => {
 router.delete("/:city/:area", auth.optional, (req, res, next) => {
 	let { city, area } = req.params;
 
-	//find city
-	City.findOne({ city: city })
-		.then(city => {
-			if (city) {
-				//delete area
-				Area.findOne({ area: area }).then(existing => {
-					if (existing) {
-						Area.deleteOne({ area: area }).then(() => {
+	//delete area
+	Area.findOne({ area: area })
+		.then(existing => {
+			if (existing) {
+				Area.deleteOne({ area: area }).then(() => {
+					//find city
+					City.findOne({ city: city }).then(city => {
+						if (city) {
+							//reduce area count
 							city.removeArea();
 							city.save();
-							return res.send(`${area} deleted.`);
-						});
-					} else {
-						return res.sendStatus(400);
-					}
+						}
+						return res.send(`${area} deleted.`);
+					});
 				});
 			} else {
-				return res.sendStatus(400);
+				return res.json({ error: `${area} not found.` });
 			}
 		})
 		.catch(err => {

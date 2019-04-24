@@ -16,8 +16,7 @@ router.post("/", auth.optional, Filters.body, (req, res, next) => {
 		} else {
 			//save address to db
 			let newAddress = result.address;
-			console.log(newAddress);
-			newAddress.save().then(() => res.json({ id: newAddress._id }));
+			newAddress.save().then(() => res.json(newAddress));
 		}
 	});
 });
@@ -45,7 +44,7 @@ router.get("/:id", auth.optional, (req, res) => {
 			if (address) {
 				res.json(address);
 			} else {
-				res.sendStatus(400);
+				res.json({ error: `Address: ${id} not found.` });
 			}
 		})
 		.catch(err => {
@@ -66,11 +65,11 @@ router.put("/:id", auth.optional, Filters.body, (req, res, next) => {
 				existing.state = address.state;
 				existing.postalCode = address.postalCode;
 				existing.country = address.country;
-
 				existing.save();
-				res.send(`Address updated.`);
+
+				res.send(existing);
 			} else {
-				return res.sendStatus(400);
+				res.json({ error: `Address: ${id} not found.` });
 			}
 		})
 		.catch(err => {

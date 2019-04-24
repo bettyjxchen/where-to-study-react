@@ -20,6 +20,7 @@ router.post("/", auth.optional, Filters.body, (req, res, next) => {
 			const address = new Address(location.address);
 			address.setDefaults();
 			address.save();
+
 			//use address in Location obj
 			delete location.address;
 			location.address_id = address._id;
@@ -32,14 +33,32 @@ router.post("/", auth.optional, Filters.body, (req, res, next) => {
 				}
 			});
 
-			console.log(location);
-
 			//create Location obj
 			const finalLocation = new Location(location);
 			finalLocation.setDefaults();
-			return finalLocation.save().then(() => res.json(finalLocation));
+			finalLocation.save();
+
+			res.json(finalLocation);
 		}
 	});
+});
+
+//GET: query locations by city
+router.get("/all", auth.optional, (req, res) => {
+	let { city } = req.query;
+
+	//find location
+	Location.find({ city: city })
+		.then(locations => {
+			if (locations && locations.length) {
+				return res.json(locations);
+			} else {
+				return res.json(null);
+			}
+		})
+		.catch(err => {
+			throw Error(err);
+		});
 });
 
 //GET: get all locations
@@ -73,6 +92,28 @@ router.get("/:id", auth.optional, (req, res) => {
 		});
 });
 
+//PUT: edit location (only like)
+router.put("/:id/like", auth.optional, (req, res, next) => {
+	let { id } = req.params;
+
+	//find location
+	Location.findOne({ _id: new ObjectId(id) })
+		.then(existing => {
+			if (existing) {
+				//update location
+				existing.like();
+				existing.save();
+
+				res.json(existing);
+			} else {
+				return res.json(null);
+			}
+		})
+		.catch(err => {
+			throw Error(err);
+		});
+});
+
 //PUT: edit location
 router.put("/:id", auth.optional, Filters.body, (req, res, next) => {
 	let { id } = req.params;
@@ -83,31 +124,71 @@ router.put("/:id", auth.optional, Filters.body, (req, res, next) => {
 		.then(existing => {
 			if (existing) {
 				//update location
-				existing.city = location.city;
-				existing.area = location.area;
 				existing.name = location.name;
 				existing.type = location.type;
+				existing.image = location.image;
 				existing.address = location.address;
 				existing.rating = location.rating;
+				existing.review = location.review;
 				existing.info = location.info;
-				existing.address_id = location.address_id;
 
 				//update address
-				Address.findOne({ _id: existing.address_id }).then(address => {
-					if (address) {
-						let { street, city, state, postalCode, country } = existing.address;
-
-						address.street = street;
-						address.city = city;
-						address.state = state;
-						address.postalCode = postalCode;
-						address.country = country;
-						address.save();
-					}
-				});
-
-				existing.save();
-				res.send(`${existing.name} updated.`);
+				Address.findOne({ _id: existing.address_id })
+					.then(address => {
+						if (address) {
+							let {
+								street,
+								city,
+								state,
+								postalCode,
+								country
+							} = existing.address;
+							address.street = street;
+							address.city = city;
+							address.state = state;
+							address.postalCode = postalCode;
+							address.country = country;
+							address.save();
+						}
+					})
+					.then(() => {
+						//update area counts if new area
+						if (existing.area !== location.area) {
+							//update area numLocations count
+							Area.findOne({ area: existing.area, city: existing.city })
+								.then(area => {
+									if (area) {
+										//remove location
+										area.removeLocation();
+										area.save();
+									}
+								})
+								.then(() => {
+									Area.findOne({
+										area: location.area,
+										city: location.city
+									}).then(area => {
+										if (area) {
+											//add area
+											area.addLocation();
+											area.save();
+										}
+									});
+								})
+								.then(() => {
+									existing.area = location.area;
+									existing.city = location.city;
+									existing.save();
+									console.log(existing);
+									res.json(existing);
+								});
+						} else {
+							existing.area = location.area;
+							existing.city = location.city;
+							existing.save();
+							res.json(existing);
+						}
+					});
 			} else {
 				return res.sendStatus(400);
 			}
@@ -126,8 +207,12 @@ router.delete("/:id", auth.optional, (req, res, next) => {
 		.then(existing => {
 			if (existing) {
 				//delete address
-				Address.deleteOne({ _id: new ObjectId(existing.address_id) })
-					.then(() => {
+				Address.findOne({ _id: new ObjectId(existing.address_id) })
+					.then(address => {
+						if (address) {
+							address.remove();
+						}
+
 						//remove one from numLocations in Areas
 						Area.findOne({ area: existing.area }).then(area => {
 							if (area) {
@@ -139,7 +224,6 @@ router.delete("/:id", auth.optional, (req, res, next) => {
 					.then(() => {
 						//delete location
 						existing.remove();
-						existing.save();
 						res.send(`${existing.name} deleted.`);
 					});
 			} else {

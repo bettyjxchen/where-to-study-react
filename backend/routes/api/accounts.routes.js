@@ -23,7 +23,6 @@ router.post("/login", auth.optional, Filters.login, (req, res, next) => {
 
 					//attach token to req.user
 					req.user.token = account.generateJWT();
-					console.log(req.user);
 					//return auth object to client
 					return res.json({ account: account.toAuthJSON() });
 				});
@@ -88,7 +87,7 @@ router.get("/:username", auth.required, (req, res, next) => {
 					id: account._id,
 					username: account.username,
 					email: account.email,
-					type: account.type,
+					isAdmin: account.isAdmin,
 					dateOpened: account.dateOpened
 				};
 
@@ -127,6 +126,18 @@ router.get("/", auth.optional, (req, res, next) => {
 				return res.json(null);
 			}
 		})
+		.catch(err => {
+			throw Error(err);
+		});
+});
+
+//DELETE: delete account by username
+router.delete("/:username", auth.optional, (req, res, next) => {
+	let { username } = req.params;
+
+	//delete account
+	Account.deleteOne({ username: username })
+		.then(() => res.status(200).send(`${username} deleted.`))
 		.catch(err => {
 			throw Error(err);
 		});
